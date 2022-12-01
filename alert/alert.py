@@ -69,9 +69,14 @@ def get_latest_data(symbol: str) -> dict:
     return curr
 
 
-def fetch_continuous_data(symbol: str, interval: int) -> None:
+def fetch_continuous_data(
+    symbol: str,
+    interval: int = 1,
+    verbose: bool = True,
+) -> None:
     while True:
         curr = get_latest_data(symbol=symbol)
         if curr['close'] is not None:
-            print(f"{symbol} | {curr['timestamp']} | {curr['close']}")
+            if verbose:
+                print(f"{symbol} | {curr['timestamp']} | {curr['close']}")
         time.sleep(interval)

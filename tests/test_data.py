@@ -1,6 +1,6 @@
 import datetime as dt
 import unittest
-from alert.data import *
+from alert.alert import *
 
 
 class DataTestCase(unittest.TestCase):
