@@ -1,15 +1,14 @@
 import datetime as dt
+import time
 
 import requests
-
-URL = 'https://iboard.ssi.com.vn/dchart/api/history'
 
 
 def get_historical_data(
     symbol: str, resolution: str, from_ts: str, to_ts: str
 ) -> dict:
     r = requests.get(
-        URL,
+        url='https://iboard.ssi.com.vn/dchart/api/history',
         params={
             'symbol': symbol,
             'resolution': resolution,
@@ -17,20 +16,20 @@ def get_historical_data(
             'to': to_ts
         }
     )
-    return r.json()
+    hist = _prep_hist(r.json())
+
+    return hist
 
 
-def get_historical_data_by_datetime(symbol: str, time: dt.datetime):
-    from_ts = time.replace(second=0).timestamp()
-    to_ts = time.replace(second=59).timestamp()
+def _prep_hist(hist: dict) -> dict:
 
-    hist = get_historical_data(
-        symbol, resolution='1', from_ts=from_ts, to_ts=to_ts
-    )
     if hist['s'] == 'ok':
         hist.pop('s')
+    else:
+        print(hist)
+
     rename_keys = {
-        't': 'ts',
+        't': 'timestamp',
         'o': 'open',
         'h': 'high',
         'l': 'low',
@@ -39,15 +38,40 @@ def get_historical_data_by_datetime(symbol: str, time: dt.datetime):
     }
     for old_key, new_key in rename_keys.items():
         hist[new_key] = hist.pop(old_key)
-        if len(hist[new_key]) == 1:
-            hist[new_key] = hist[new_key][0]
-        
-    hist['vol'] = int(hist['vol'])
-    hist['ts'] = int(hist['ts'])
-    
-    for key in ['open', 'high', 'low', 'close', 'vol']:
-        hist[key] = float(hist[key])
-    hist['ts'] = dt.datetime.fromtimestamp(hist['ts'])
-    
+
+    hist['timestamp'] = [
+        dt.datetime.fromtimestamp(int(ele)) for ele in hist['timestamp']
+    ]
+
+    for key in ['open', 'high', 'low', 'close']:
+        hist[key] = [float(ele) for ele in hist[key]]
+
+    hist['vol'] = [int(ele) for ele in hist['vol']]
+
+    for key in hist.keys():
+        if len(hist[key]) == 1:
+            hist[key] = hist[key][0]
+        elif len(hist[key]) == 0:
+            hist[key] = None
+
     return hist
-    
+
+
+def get_latest_data(symbol: str) -> dict:
+    now = dt.datetime.now().replace(microsecond=0)
+    curr = get_historical_data(
+        symbol=symbol,
+        resolution='1',
+        from_ts=now.replace(second=0).timestamp(),
+        to_ts=now.timestamp()
+    )
+    curr['timestamp'] = now
+    return curr
+
+
+def fetch_continuous_data(symbol: str, interval: int) -> None:
+    while True:
+        curr = get_latest_data(symbol=symbol)
+        if curr['close'] is not None:
+            print(f"{symbol} | {curr['timestamp']} | {curr['close']}")
+        time.sleep(interval)
