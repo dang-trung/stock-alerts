@@ -40,4 +40,5 @@ ENV/
 
 # Others
 data/
-*.toml
+config.toml
+alerts.csv
