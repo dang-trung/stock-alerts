@@ -1,4 +1,4 @@
 from .alert import *
 
 if __name__ == '__main__':
-    loop_test()
+    fetch_continuous_data(symbol='VN30F1M')

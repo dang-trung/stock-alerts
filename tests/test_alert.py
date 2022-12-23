@@ -39,7 +39,9 @@ class DataTestCase(unittest.TestCase):
         )
         self.assertEqual(hist['timestamp'].minute, 25)
         print(hist)
-
+    
+    def test_get_config(self):
+        print(get_config())
 
 if __name__ == '__main__':
     unittest.main()

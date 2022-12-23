@@ -39,6 +39,5 @@ ENV/
 /notebooks/
 
 # Others
-data/
-config.toml
+skype_config.toml
 alerts.csv

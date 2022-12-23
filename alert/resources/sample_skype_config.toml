@@ -1,0 +1,4 @@
+acc = ''
+pwd = ''
+target_users = ['8:live:user1', '8:live:user2']
+admin = '8:live:admin'
