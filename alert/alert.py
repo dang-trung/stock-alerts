@@ -95,7 +95,7 @@ def get_bar(symbol, closed_at: dt.datetime, timeframe: str = '1m') -> dict:
 
 
 def get_current_data(symbol: str) -> dict:
-    now = dt.datetime.now().replace(microsecond=0) - dt.timedelta(seconds=16000)
+    now = dt.datetime.now().replace(microsecond=0)
     curr = get_historical_data(
         symbol=symbol,
         resolution='1',
@@ -146,7 +146,7 @@ def fetch_continuous_data(
 
                             now = dt.datetime.now().replace(
                                 microsecond=0
-                            ) - dt.timedelta(seconds=16000)
+                            )
 
                             if alert['last_update'] == '':
                                 need_update = True
@@ -155,18 +155,18 @@ def fetch_continuous_data(
                                     alert['last_update'], '%Y-%m-%d %H:%M:%S'
                                 )
                                 if (now - alert['last_update']) > dt.timedelta(
-                                    seconds=30
+                                    seconds=60
                                 ):
                                     need_update = True
 
                             if need_update:
                                 if alert['sign'] == '>':
                                     cond = (
-                                        curr['close'] > float(alert['value'])
+                                        curr['high'] > float(alert['value'])
                                     )
-                                elif alert['type'] == '<':
+                                elif alert['sign'] == '<':
                                     cond = (
-                                        curr['close'] < float(alert['value'])
+                                        curr['low'] < float(alert['value'])
                                     )
                             if cond:
                                 msg = (
@@ -203,6 +203,7 @@ def fetch_continuous_data(
             time.sleep(interval)
         except Exception as e:
             send_message(msg=str(e), target=admin)
+            break 
 
 
 def get_alerts() -> list[dict]:
