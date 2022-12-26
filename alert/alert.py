@@ -2,7 +2,7 @@ import csv
 import datetime as dt
 from pathlib import Path
 import time
-import toml
+import tomllib
 
 import requests
 from skpy import Skype
@@ -30,8 +30,8 @@ def _prep_hist(hist: dict) -> dict:
 
     if hist['s'] == 'ok':
         hist.pop('s')
-    else:
-        return None  # no data
+    elif hist['s'] == 'no_data':
+        hist = {'t': [], 'o': [], 'h': [], 'l': [], 'c': [], 'v': []}  # no data
 
     rename_keys = {
         't': 'timestamp',
@@ -74,7 +74,7 @@ def get_bar(symbol, closed_at: dt.datetime, timeframe: str = '1m') -> dict:
         }
     elif timeframe == '5m':
         if closed_at.minute % 5 != 0:
-            closed_at += dt.timedelta(seconds=60 * (5 - (closed_at.minute % 5)))
+            closed_at += dt.timedelta(minutes=(5 - closed_at.minute % 5))
 
         from_ts = (closed_at - dt.timedelta(seconds=301)).timestamp()
         to_ts = closed_at.timestamp()
@@ -119,14 +119,82 @@ def fetch_continuous_data(
     admin = sk.chats[config['admin']]
     targets = [sk.chats[target_user] for target_user in config['target_users']]
 
+    spot_ato = dt.datetime.now().replace(
+        hour=9, minute=15, second=0, microsecond=0
+    )
+    minutes_to_spot_ato = 2
+
+    break_time = dt.datetime.now().replace(
+        hour=11, minute=30, second=59, microsecond=0
+    )
+    minutes_to_break_time = 3
+
+    trading_resume = dt.datetime.now().replace(
+        hour=13, minute=0, second=0, microsecond=0
+    )
+    minutes_to_trading_resume = 2
+
+    atc_open = dt.datetime.now().replace(
+        hour=14, minute=30, second=0, microsecond=0
+    )
+    atc_end = dt.datetime.now().replace(
+        hour=14, minute=45, second=0, microsecond=0
+    )
+    minutes_to_atc_open = 5
+
     while True:
         try:
             curr = get_current_data(symbol=symbol)
-            if curr is None:
-                send_messages(msg='Market Closed.', targets=targets)
+            # checking Spot ATO
+            if minutes_to_spot_ato > 0 and (
+                curr['timestamp'] >
+                spot_ato - dt.timedelta(minutes=minutes_to_spot_ato)
+            ):
+                send_messages(
+                    f"Spot ATO in {minutes_to_spot_ato} min.", targets
+                )
+                minutes_to_spot_ato -= 1
+
+            # checking Lunchbreak time
+            if minutes_to_break_time > 0 and (
+                curr['timestamp'] >
+                break_time - dt.timedelta(minutes=minutes_to_break_time)
+            ):
+                send_messages(
+                    f"{symbol} | Lunch Break in {minutes_to_break_time} min.",
+                    targets
+                )
+                minutes_to_break_time -= 1
+
+            # Trading resume
+            if minutes_to_trading_resume >= 0 and (
+                curr['timestamp'] > trading_resume -
+                dt.timedelta(minutes=minutes_to_trading_resume)
+            ):
+                send_messages(
+                    f"{symbol} | Trading Resume in {minutes_to_trading_resume} min.",
+                    targets
+                )
+                minutes_to_trading_resume -= 1
+
+            # checking ATC time
+            if minutes_to_atc_open > 0 and (
+                curr['timestamp'] >
+                atc_open - dt.timedelta(minutes=minutes_to_atc_open)
+            ):
+                send_messages(
+                    f"{symbol} | ATC in {minutes_to_atc_open} min.", targets
+                )
+                minutes_to_atc_open -= 1
+
+            if curr['timestamp'] > atc_end:
+                send_messages(
+                    f"{symbol} | Market Closed @ {curr['close']}.", targets
+                )
                 break
 
             if curr['close'] is not None:
+
                 if verbose:
                     print(f"{symbol} | {curr['timestamp']} | {curr['close']}")
 
@@ -140,13 +208,10 @@ def fetch_continuous_data(
                         if (
                             alert['asset'] == symbol.lower() and
                             alert['type'] == 'price' and
-                            alert['status'] == 'active' and
-                            alert['timeframe'] == '1'
+                            alert['active'] == '' and alert['timeframe'] == '1'
                         ):
 
-                            now = dt.datetime.now().replace(
-                                microsecond=0
-                            )
+                            now = dt.datetime.now().replace(microsecond=0)
 
                             if alert['last_update'] == '':
                                 need_update = True
@@ -155,7 +220,7 @@ def fetch_continuous_data(
                                     alert['last_update'], '%Y-%m-%d %H:%M:%S'
                                 )
                                 if (now - alert['last_update']) > dt.timedelta(
-                                    seconds=60
+                                    minutes=1
                                 ):
                                     need_update = True
 
@@ -165,9 +230,7 @@ def fetch_continuous_data(
                                         curr['high'] > float(alert['value'])
                                     )
                                 elif alert['sign'] == '<':
-                                    cond = (
-                                        curr['low'] < float(alert['value'])
-                                    )
+                                    cond = (curr['low'] < float(alert['value']))
                             if cond:
                                 msg = (
                                     f"{alert['asset'].upper()} | "
@@ -182,7 +245,7 @@ def fetch_continuous_data(
                                     alert['alert_times']
                                 ) - 1
                                 if alert['alert_times'] == 0:
-                                    alert['status'] = 'inactive'
+                                    alert['active'] = 'x'
 
                             alerts[i] = alert  # rewrite alert
 
@@ -193,7 +256,7 @@ def fetch_continuous_data(
                     ) as alert_lists:
                         fieldnames = [
                             'asset', 'timeframe', 'type', 'sign', 'value',
-                            'note', 'status', 'alert_times', 'last_update'
+                            'note', 'active', 'alert_times', 'last_update'
                         ]
                         writer = csv.DictWriter(
                             alert_lists, fieldnames=fieldnames
@@ -203,7 +266,7 @@ def fetch_continuous_data(
             time.sleep(interval)
         except Exception as e:
             send_message(msg=str(e), target=admin)
-            break 
+            break
 
 
 def get_alerts() -> list[dict]:
@@ -224,5 +287,7 @@ def send_messages(msg: str, targets: list[SkypeSingleChat]):
 
 
 def get_skype_config():
-    config = toml.load(Path('alert') / 'resources' / 'skype_config.toml')
+    with open(Path('alert') / 'resources' / 'skype_config.toml', 'rb') as f:
+        config = tomllib.load(f)
+
     return config

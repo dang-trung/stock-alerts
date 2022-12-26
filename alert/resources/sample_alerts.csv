@@ -1,5 +1,5 @@
-asset,timeframe,type,sign,value,note,status,alert_times,last_update
-vn30f1m,1,price,>,950,canh short,active,46,2022-12-23 14:26:26
-vn30f1m,1,price,<,900,long,active,1,
-nvl,5,volume,<,10000,careful vn30f1m short,inactive,1,
-vn30f1m,1,price,<,900,long,active,1,
+asset,timeframe,type,sign,value,note,active,alert_times,last_update
+vn30f1m,1,price,>,950,canh short,,46,2022-12-23 14:26:26
+vn30f1m,1,price,<,900,long,,1,
+nvl,5,volume,<,10000,careful vn30f1m short,x,1,
+vn30f1m,1,price,<,900,long,,1,
